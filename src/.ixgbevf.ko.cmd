@@ -1,0 +1,1 @@
+cmd_/root/ixgbevf-4.0.3/src/ixgbevf.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /root/ixgbevf-4.0.3/src/ixgbevf.ko /root/ixgbevf-4.0.3/src/ixgbevf.o /root/ixgbevf-4.0.3/src/ixgbevf.mod.o
