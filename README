@@ -1,4 +1,6 @@
+We modify ixgbevf_main.c to support SFC by receive a netlink message from userspace daemon.
 
+=================================================================
 
 ixgbevf Linux* Virtual Function (VF) Driver for Intel(R) Ethernet Network 
 Connection
