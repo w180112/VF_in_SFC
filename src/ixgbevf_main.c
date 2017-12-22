@@ -4242,7 +4242,7 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	struct iphdr *iph = (struct iphdr*)(skb->head+skb->network_header);
 	struct tcphdr *tcp = (struct tcphdr*)(skb->head+skb->transport_header);
 	__u32 da_ip = in_aton(sfc_info.ip);
-	int data_len;
+	int data_len = 0;
 	struct ixgbevf_tx_buffer *first;
 	int tso;
 	u32 tx_flags = 0;
@@ -4260,12 +4260,13 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	}
 	/*new for SFC*/
 	/*1711935660 is 172.16.10.102*/
+	printk("sa_ip %u\n", sfc_info.sa_ip);
 	if (iph->daddr == sfc_info.sa_ip) {
 		data_len = ntohs(iph->tot_len) - tcp->doff*4 - iph->ihl*4;
 		printk("data length = %d\n", data_len);
 	}
 	/*new for SFC*/
-	if ((iph->daddr == sfc_info.sa_ip) && (sfc_set == 1 && data_len != 0)) {
+	if ((iph->daddr == sfc_info.sa_ip) && (sfc_set == 1 && data_len > 0)) {
 		//printk("sfc list mac = %pM\n", sfc_info.mac);
 		memcpy(dmac,sfc_info.mac,ETH_ALEN);
 		//printk("dmac = %pM\n", dmac);
