@@ -89,10 +89,11 @@ typedef struct sfc {
 	int vf;
 	char ip[15];
 	unsigned char mac[6];
+	uint32_t sa_ip;
 	struct sfc *next;
 }sfc_t;
 sfc_t sfc_info;
-int sfc_set = 0;
+uint8_t sfc_set = 0;
 
 static void netlink_test();
 
@@ -4236,10 +4237,12 @@ dma_error:
 static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 				   struct ixgbevf_ring *tx_ring)
 {
-	struct ethhdr *test = NULL;
+	struct ethhdr *mach = (struct ethhdr *)(skb->head+skb->mac_header);
 	unsigned char dmac[ETH_ALEN];
-	struct iphdr *iph = NULL;
+	struct iphdr *iph = (struct iphdr*)(skb->head+skb->network_header);
+	struct tcphdr *tcp = (struct tcphdr*)(skb->head+skb->transport_header);
 	__u32 da_ip = in_aton(sfc_info.ip);
+	int data_len;
 	struct ixgbevf_tx_buffer *first;
 	int tso;
 	u32 tx_flags = 0;
@@ -4256,19 +4259,21 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 	}
 	/*new for SFC*/
-	if ((ip_hdr(skb)->daddr == 1711935660) && sfc_set == 1) {
-		printk("sfc list mac = %pM\n", sfc_info.mac);
+	/*1711935660 is 172.16.10.102*/
+	if (iph->daddr == sfc_info.sa_ip) {
+		data_len = ntohs(iph->tot_len) - tcp->doff*4 - iph->ihl*4;
+		printk("data length = %d\n", data_len);
+	}
+	/*new for SFC*/
+	if ((iph->daddr == sfc_info.sa_ip) && (sfc_set == 1 && data_len != 0)) {
+		//printk("sfc list mac = %pM\n", sfc_info.mac);
 		memcpy(dmac,sfc_info.mac,ETH_ALEN);
-		//strcpy(dmac,sfc_info.mac); 
-		printk("dmac = %pM\n", dmac);
-		test = (struct ethhdr *)(skb->head+skb->mac_header);
-		iph = (struct iphdr*)(skb->head+skb->network_header);
+		//printk("dmac = %pM\n", dmac);
 		iph->daddr = da_ip;
 		printk("iph = %u skb ip = %u\n",iph->daddr, ip_hdr(skb)->daddr);
-		//printk("skb ip = %u\n",ip_hdr(skb)->daddr);
 		ip_send_check(iph);
-		memcpy(test->h_dest,dmac,ETH_ALEN);
-		printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
+		memcpy(mach->h_dest,dmac,ETH_ALEN);
+		//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
 	}
 	//printk("data len = %u\n", skb->data_len);
 	//printk("mac header = %s\ninner = %s\n", skb_network_header(skb));
@@ -5147,6 +5152,7 @@ static void nl_data_ready(struct sk_buff *skb)
     sfc_info.vf = ((sfc_t*)NLMSG_DATA(nlh))->vf;
     strcpy(sfc_info.ip,((sfc_t*)NLMSG_DATA(nlh))->ip);
     memcpy(sfc_info.mac,((sfc_t*)NLMSG_DATA(nlh))->mac,6);
+    sfc_info.sa_ip = ((sfc_t*)NLMSG_DATA(nlh))->sa_ip;
     printk("vf = %d ip = %s\n", sfc_info.vf, sfc_info.ip);
     int j;
     //memcpy(&sfc_info,&buf,sizeof(buf));
