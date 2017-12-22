@@ -1,4 +1,4 @@
-We modify ixgbevf_main.c to support SFC by receive a netlink message from userspace daemon.
+We modify ixgbevf to support SFC by receive a netlink message from userspace daemon.
 
 =================================================================
 
