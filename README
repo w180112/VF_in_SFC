@@ -1,4 +1,4 @@
-We modify ixgbevf to support SFC by receive a netlink message from userspace daemon.
+We modify ixgbevf driver to support SFC by receive a netlink message from userspace daemon.
 
 =================================================================
 
