@@ -4272,31 +4272,19 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	/*new for SFC*/
 	data_len = ntohs(iph->tot_len) - tcp->doff*4 - iph->ihl*4;
 	printk("data length = %d\n", data_len);
-	if (sfc_set == FIRST && data_len > 0) {
+	if ((sfc_set == FIRST || sfc_set == NODE) && data_len > 0) {
 		if (iph->daddr == sfc_info.sa_ip) {
 			//printk("sfc list mac = %pM\n", sfc_info.mac);
 			iph->daddr = in_aton(sfc_info.ip);
 			iph->saddr = sfc_info.sa_ip;
 			tcp->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
-			printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
+			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 			ip_send_check(iph);
 			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
-			printk("mach->h_dest = %pM\n", mach->h_dest);
+			//printk("mach->h_dest = %pM\n", mach->h_dest);
 			//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
 		}
 	}
-	else if (sfc_set == NODE && data_len > 0) {
-		if (iph->daddr == sfc_info.sa_ip) {
-			iph->daddr = in_aton(sfc_info.ip);
-			iph->saddr = sfc_info.sa_ip;
-			tcp->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
-			printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
-			ip_send_check(iph);
-			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
-			printk("mach->h_dest = %pM\n", mach->h_dest);
-		}	
-	}
-	
 	
 	//printk("data len = %u\n", skb->data_len);
 	//printk("mac header = %s\ninner = %s\n", skb_network_header(skb));
