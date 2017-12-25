@@ -85,12 +85,20 @@ static void nl_data_ready(struct sk_buff *skb);
 } netlink_t;
 netlink_t netlink;*/
 
+enum {
+	OFF,
+	FIRST,
+	NODE,
+	END
+};
+
 typedef struct sfc {
 	int vf;
 	char ip[15];
 	unsigned char mac[6];
 	uint32_t sa_ip;
 	struct sfc *next;
+	uint8_t sfc_mode;
 }sfc_t;
 sfc_t sfc_info;
 uint8_t sfc_set = 0;
@@ -4238,10 +4246,10 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 				   struct ixgbevf_ring *tx_ring)
 {
 	struct ethhdr *mach = (struct ethhdr *)(skb->head+skb->mac_header);
-	unsigned char dmac[ETH_ALEN];
+	//unsigned char dmac[ETH_ALEN];
 	struct iphdr *iph = (struct iphdr*)(skb->head+skb->network_header);
 	struct tcphdr *tcp = (struct tcphdr*)(skb->head+skb->transport_header);
-	__u32 da_ip = in_aton(sfc_info.ip);
+	//__u32 da_ip = in_aton(sfc_info.ip);
 	int data_len = 0;
 	struct ixgbevf_tx_buffer *first;
 	int tso;
@@ -4260,23 +4268,35 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	}
 	/*new for SFC*/
 	/*1711935660 is 172.16.10.102*/
-	printk("sa_ip %u\n", sfc_info.sa_ip);
-	if (iph->daddr == sfc_info.sa_ip) {
-		data_len = ntohs(iph->tot_len) - tcp->doff*4 - iph->ihl*4;
-		printk("data length = %d\n", data_len);
-	}
+	//printk("sa_ip %u\n", sfc_info.sa_ip);
 	/*new for SFC*/
-	if ((iph->daddr == sfc_info.sa_ip) && (sfc_set == 1 && data_len > 0)) {
-		//printk("sfc list mac = %pM\n", sfc_info.mac);
-		memcpy(dmac,sfc_info.mac,ETH_ALEN);
-		//printk("dmac = %pM\n", dmac);
-		iph->daddr = da_ip;
-		tcp->dest = 20000;
-		printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
-		ip_send_check(iph);
-		memcpy(mach->h_dest,dmac,ETH_ALEN);
-		//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
+	data_len = ntohs(iph->tot_len) - tcp->doff*4 - iph->ihl*4;
+	printk("data length = %d\n", data_len);
+	if (sfc_set == FIRST && data_len > 0) {
+		if (iph->daddr == sfc_info.sa_ip) {
+			//printk("sfc list mac = %pM\n", sfc_info.mac);
+			iph->daddr = in_aton(sfc_info.ip);
+			tcp->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
+			printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
+			ip_send_check(iph);
+			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
+			printk("mach->h_dest = %pM\n", mach->h_dest);
+			//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
+		}
 	}
+	else if (sfc_set == NODE && data_len > 0) {
+		if (iph->daddr == sfc_info.sa_ip) {
+			iph->daddr = in_aton(sfc_info.ip);
+			iph->saddr = sfc_info.sa_ip;
+			tcp->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
+			printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
+			ip_send_check(iph);
+			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
+			printk("mach->h_dest = %pM\n", mach->h_dest);
+		}	
+	}
+	
+	
 	//printk("data len = %u\n", skb->data_len);
 	//printk("mac header = %s\ninner = %s\n", skb_network_header(skb));
 	/*
@@ -5155,14 +5175,15 @@ static void nl_data_ready(struct sk_buff *skb)
     strcpy(sfc_info.ip,((sfc_t*)NLMSG_DATA(nlh))->ip);
     memcpy(sfc_info.mac,((sfc_t*)NLMSG_DATA(nlh))->mac,6);
     sfc_info.sa_ip = ((sfc_t*)NLMSG_DATA(nlh))->sa_ip;
-    printk("vf = %d ip = %s\n", sfc_info.vf, sfc_info.ip);
+    sfc_info.sfc_mode = ((sfc_t*)NLMSG_DATA(nlh))->sfc_mode;
+    /*printk("vf = %d ip = %s\n", sfc_info.vf, sfc_info.ip);
     int j;
     //memcpy(&sfc_info,&buf,sizeof(buf));
     for(j=0; j<6; j++) {
 	printk("sfc mac = %x\n", sfc_info.mac[j]);
     }
-    printk("receive sfc mac = %pM\n", sfc_info.mac);
-    sfc_set = 1;
+    printk("receive sfc mac = %pM\n", sfc_info.mac);*/
+    sfc_set = sfc_info.sfc_mode;
     //printk(KERN_INFO"%s:received message from %d|%d|%d|%d: %s\n", __FUNCTION__, nlh->nlmsg_pid, NETLINK_CB(skb).portid, nlmsg_total_size(0), skb->len, (char *)NLMSG_DATA(nlh));
     // print info of nlh
     /*printk(KERN_INFO"In Recved Msg type|len|flags|pid|seq %d|%d|%d|%d|%d\n",
