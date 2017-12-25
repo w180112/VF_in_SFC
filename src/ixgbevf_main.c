@@ -5184,6 +5184,7 @@ static void nl_data_ready(struct sk_buff *skb)
     }
     printk("receive sfc mac = %pM\n", sfc_info.mac);*/
     sfc_set = sfc_info.sfc_mode;
+    printk("sfc mode = %u\n", sfc_set);
     //printk(KERN_INFO"%s:received message from %d|%d|%d|%d: %s\n", __FUNCTION__, nlh->nlmsg_pid, NETLINK_CB(skb).portid, nlmsg_total_size(0), skb->len, (char *)NLMSG_DATA(nlh));
     // print info of nlh
     /*printk(KERN_INFO"In Recved Msg type|len|flags|pid|seq %d|%d|%d|%d|%d\n",
