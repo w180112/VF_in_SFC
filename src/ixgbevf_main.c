@@ -4271,7 +4271,8 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 		memcpy(dmac,sfc_info.mac,ETH_ALEN);
 		//printk("dmac = %pM\n", dmac);
 		iph->daddr = da_ip;
-		printk("iph = %u skb ip = %u\n",iph->daddr, ip_hdr(skb)->daddr);
+		tcp->dest = 20000;
+		printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 		ip_send_check(iph);
 		memcpy(mach->h_dest,dmac,ETH_ALEN);
 		//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
