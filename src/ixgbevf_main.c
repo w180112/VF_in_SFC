@@ -4276,6 +4276,7 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 		if (iph->daddr == sfc_info.sa_ip) {
 			//printk("sfc list mac = %pM\n", sfc_info.mac);
 			iph->daddr = in_aton(sfc_info.ip);
+			iph->saddr = sfc_info.sa_ip;
 			tcp->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
 			printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 			ip_send_check(iph);
