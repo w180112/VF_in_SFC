@@ -93,7 +93,7 @@ enum {
 };
 
 typedef struct sfc {
-	int vf;
+	uint8_t vf;
 	char ip[15];
 	unsigned char mac[6];
 	uint32_t sa_ip;
@@ -4248,8 +4248,8 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	struct ethhdr *mach = (struct ethhdr *)(skb->head+skb->mac_header);
 	//unsigned char dmac[ETH_ALEN];
 	struct iphdr *iph = (struct iphdr*)(skb->head+skb->network_header);
-	struct tcphdr *tcp = (struct tcphdr*)(skb->head+skb->transport_header);
-	//__u32 da_ip = in_aton(sfc_info.ip);
+	//struct tcphdr *tcph = (struct tcphdr*)(skb->head+skb->transport_header);
+	struct udphdr *udph = (void *)iph + iph->ihl*4;
 	int data_len = 0;
 	struct ixgbevf_tx_buffer *first;
 	int tso;
@@ -4270,14 +4270,15 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	/*1711935660 is 172.16.10.102*/
 	//printk("sa_ip %u\n", sfc_info.sa_ip);
 	/*new for SFC*/
-	data_len = ntohs(iph->tot_len) - tcp->doff*4 - iph->ihl*4;
+	//data_len = ntohs(iph->tot_len) - tcph->doff*4 - iph->ihl*4;
+	data_len = ntohs(iph->tot_len) - iph->ihl*4 - sizeof(*udph);
 	printk("data length = %d\n", data_len);
 	if ((sfc_set == FIRST || sfc_set == NODE) && data_len > 0) {
 		if (iph->daddr == sfc_info.sa_ip) {
 			//printk("sfc list mac = %pM\n", sfc_info.mac);
 			iph->daddr = in_aton(sfc_info.ip);
 			iph->saddr = sfc_info.sa_ip;
-			tcp->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
+			udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
 			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 			ip_send_check(iph);
 			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
