@@ -5209,7 +5209,7 @@ static void netlink_test()
     }
 }
 
-uint16_t udp_checksum(const void *buff, size_t len, in_addr_t src_addr, in_addr_t dest_addr)
+uint16_t udp_checksum(const void *buff, size_t len, uint32_t src_addr, uint32_t dest_addr)
 {
         const uint16_t *buf=buff;
         uint16_t *ip_src=(void *)&src_addr, *ip_dst=(void *)&dest_addr;
