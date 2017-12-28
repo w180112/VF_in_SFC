@@ -64,6 +64,9 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/inet.h>
+//#include <net/network.h>
+#include <net/ip.h>
+#include <net/udp.h>
 
 #define RELEASE_TAG
 
@@ -71,12 +74,16 @@
 #define DRV_SUMMARY __stringify(Intel(R) 10GbE PCI Express Virtual Function Driver)
 #define NETLINK_TEST 17
 
+
+
+
 const char ixgbevf_driver_version[] = DRV_VERSION;
 char ixgbevf_driver_name[] = "ixgbevf";
 static const char ixgbevf_driver_string[] = DRV_SUMMARY;
 static const char ixgbevf_copyright[] = "Copyright(c) 1999 - 2016 Intel Corporation.";
 static struct sock *nl_sk = NULL;
 static void nl_data_ready(struct sk_buff *skb);
+uint16_t udp_checksum();
 /*typedef struct netlink_struct {
 	struct ixgbevf_adapter *adapter;
 	struct ixgbe_hw *hw;
@@ -97,6 +104,7 @@ typedef struct sfc {
 	char ip[15];
 	unsigned char mac[6];
 	uint32_t sa_ip;
+	unsigned char sa_mac[6];
 	struct sfc *next;
 	uint8_t sfc_mode;
 }sfc_t;
@@ -4281,7 +4289,9 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 			udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
 			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 			ip_send_check(iph);
+			udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
 			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
+			memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
 			//printk("mach->h_dest = %pM\n", mach->h_dest);
 			//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
 		}
@@ -5165,6 +5175,7 @@ static void nl_data_ready(struct sk_buff *skb)
     strcpy(sfc_info.ip,((sfc_t*)NLMSG_DATA(nlh))->ip);
     memcpy(sfc_info.mac,((sfc_t*)NLMSG_DATA(nlh))->mac,6);
     sfc_info.sa_ip = ((sfc_t*)NLMSG_DATA(nlh))->sa_ip;
+    memcpy(sfc_info.sa_mac,((sfc_t*)NLMSG_DATA(nlh))->sa_mac,6);
     sfc_info.sfc_mode = ((sfc_t*)NLMSG_DATA(nlh))->sfc_mode;
     /*printk("vf = %d ip = %s\n", sfc_info.vf, sfc_info.ip);
     int j;
@@ -5198,6 +5209,43 @@ static void netlink_test()
     }
 }
 
+uint16_t udp_checksum(const void *buff, size_t len, in_addr_t src_addr, in_addr_t dest_addr)
+{
+        const uint16_t *buf=buff;
+        uint16_t *ip_src=(void *)&src_addr, *ip_dst=(void *)&dest_addr;
+        uint32_t sum;
+        size_t length=len;
+ 
+        // Calculate the sum                                            //
+        sum = 0;
+        while (len > 1) {
+                sum += *buf++;
+                if (sum & 0x80000000)
+                        sum = (sum & 0xFFFF) + (sum >> 16);
+                len -= 2;
+        }
+ 
+        if ( len & 1 )
+                // Add the padding if the packet lenght is odd          //
+                sum += *((uint8_t *)buf);
+ 
+        // Add the pseudo-header                                        //
+        sum += *(ip_src++);
+        sum += *ip_src;
+ 
+        sum += *(ip_dst++);
+        sum += *ip_dst;
+ 
+        sum += htons(IPPROTO_UDP);
+        sum += htons(length);
+ 
+        // Add the carries                                              //
+        while (sum >> 16)
+                sum = (sum & 0xFFFF) + (sum >> 16);
+ 
+        // Return the one's complement of sum                           //
+        return ( (uint16_t)(~sum)  );
+}
 
 /**
  * ixgbevf_init_module - Driver Registration Routine

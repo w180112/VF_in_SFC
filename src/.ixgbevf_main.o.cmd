@@ -1224,6 +1224,7 @@ deps_/root/ixgbevf-4.0.3/src/ixgbevf_main.o := \
   include/linux/netfilter_ipv4.h \
   include/uapi/linux/netfilter_ipv4.h \
   include/linux/inet.h \
+  include/net/udp.h \
 
 /root/ixgbevf-4.0.3/src/ixgbevf_main.o: $(deps_/root/ixgbevf-4.0.3/src/ixgbevf_main.o)
 
