@@ -101,7 +101,7 @@ enum {
 
 typedef struct sfc {
 	uint8_t vf;
-	char ip[15];
+	uint32_t ip;
 	unsigned char mac[6];
 	uint32_t sa_ip;
 	unsigned char sa_mac[6];
@@ -4284,7 +4284,7 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	if ((sfc_set == FIRST || sfc_set == NODE) && data_len > 0) {
 		if (iph->daddr == sfc_info.sa_ip) {
 			//printk("sfc list mac = %pM\n", sfc_info.mac);
-			iph->daddr = in_aton(sfc_info.ip);
+			iph->daddr = sfc_info.ip;
 			iph->saddr = sfc_info.sa_ip;
 			udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
 			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
@@ -5172,7 +5172,7 @@ static void nl_data_ready(struct sk_buff *skb)
     }
     nlh = (struct nlmsghdr *)skb->data;
     sfc_info.vf = ((sfc_t*)NLMSG_DATA(nlh))->vf;
-    strcpy(sfc_info.ip,((sfc_t*)NLMSG_DATA(nlh))->ip);
+    sfc_info.ip = ((sfc_t*)NLMSG_DATA(nlh))->ip;
     memcpy(sfc_info.mac,((sfc_t*)NLMSG_DATA(nlh))->mac,6);
     sfc_info.sa_ip = ((sfc_t*)NLMSG_DATA(nlh))->sa_ip;
     memcpy(sfc_info.sa_mac,((sfc_t*)NLMSG_DATA(nlh))->sa_mac,6);
@@ -5211,10 +5211,10 @@ static void netlink_test()
 
 uint16_t udp_checksum(const void *buff, size_t len, uint32_t src_addr, uint32_t dest_addr)
 {
-        const uint16_t *buf=buff;
-        uint16_t *ip_src=(void *)&src_addr, *ip_dst=(void *)&dest_addr;
+        const uint16_t *buf = buff;
+        uint16_t *ip_src = (void *)&src_addr, *ip_dst = (void *)&dest_addr;
         uint32_t sum;
-        size_t length=len;
+        size_t length = len;
  
         // Calculate the sum                                            //
         sum = 0;
