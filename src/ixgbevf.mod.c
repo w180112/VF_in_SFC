@@ -36,7 +36,6 @@ __attribute__((section("__versions"))) = {
 	{ 0x930484aa, __VMLINUX_SYMBOL_STR(cpu_online_mask) },
 	{ 0x79aa04a2, __VMLINUX_SYMBOL_STR(get_random_bytes) },
 	{ 0x59d5a7f7, __VMLINUX_SYMBOL_STR(dma_set_mask) },
-	{ 0x1b6314fd, __VMLINUX_SYMBOL_STR(in_aton) },
 	{ 0xbfa86c5a, __VMLINUX_SYMBOL_STR(napi_hash_del) },
 	{ 0x1c3e657e, __VMLINUX_SYMBOL_STR(pci_disable_device) },
 	{ 0xc7a4fbed, __VMLINUX_SYMBOL_STR(rtnl_lock) },
@@ -151,7 +150,6 @@ __attribute__((section("__versions"))) = {
 	{ 0x9427acde, __VMLINUX_SYMBOL_STR(pcie_capability_read_word) },
 	{ 0xf20dabd8, __VMLINUX_SYMBOL_STR(free_irq) },
 	{ 0x53108e44, __VMLINUX_SYMBOL_STR(pci_save_state) },
-	{ 0xe914e41e, __VMLINUX_SYMBOL_STR(strcpy) },
 	{ 0x906ac89f, __VMLINUX_SYMBOL_STR(alloc_etherdev_mqs) },
 };
 
@@ -171,5 +169,5 @@ MODULE_ALIAS("pci:v00008086d000015A9sv*sd*bc*sc*i*");
 MODULE_ALIAS("pci:v00008086d000015C5sv*sd*bc*sc*i*");
 MODULE_ALIAS("pci:v00008086d000015B4sv*sd*bc*sc*i*");
 
-MODULE_INFO(srcversion, "BACED2408E35FCD7848FF84");
+MODULE_INFO(srcversion, "CE8281A9FA6E91805BE0F2E");
 MODULE_INFO(rhelversion, "7.3");
