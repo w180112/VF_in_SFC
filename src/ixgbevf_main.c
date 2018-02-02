@@ -101,7 +101,9 @@ enum {
 
 typedef struct sfc {
 	uint8_t vf;
+	uint32_t prev_ip;
 	uint32_t ip;
+	uint32_t next_ip;
 	unsigned char mac[6];
 	uint32_t sa_ip;
 	unsigned char sa_mac[6];
@@ -4258,7 +4260,7 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	struct iphdr *iph = (struct iphdr*)(skb->head+skb->network_header);
 	//struct tcphdr *tcph = (struct tcphdr*)(skb->head+skb->transport_header);
 	struct udphdr *udph = (void *)iph + iph->ihl*4;
-	int data_len = 0;
+	//int data_len = 0;
 	struct ixgbevf_tx_buffer *first;
 	int tso;
 	u32 tx_flags = 0;
@@ -4279,24 +4281,39 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	//printk("sa_ip %u\n", sfc_info.sa_ip);
 	/*new for SFC*/
 	//data_len = ntohs(iph->tot_len) - tcph->doff*4 - iph->ihl*4;
-	data_len = ntohs(iph->tot_len) - iph->ihl*4 - sizeof(*udph);
-	printk("data length = %d\n", data_len);
-	if ((sfc_set == FIRST || sfc_set == NODE) && data_len > 0) {
-		if (iph->daddr == sfc_info.sa_ip) {
+	//data_len = ntohs(iph->tot_len) - iph->ihl*4 - sizeof(*udph);
+	//printk("data length = %d\n", data_len);
+	//if (sfc_set == FIRST || sfc_set == NODE) {
+		if ((iph->daddr == sfc_info.prev_ip) && (udph->dest == 8270)) {
 			//printk("sfc list mac = %pM\n", sfc_info.mac);
-			iph->daddr = sfc_info.ip;
-			iph->saddr = sfc_info.sa_ip;
+			uint32_t pseudo_check;
+			//printk("udp checksum = %hu\n", udph->check);
+			if (sfc_info.sfc_mode == END) {
+				if ((pseudo_check = udph->check + (sfc_info.next_ip>>16) - (iph->daddr>>16)) >> 16)
+					pseudo_check = (pseudo_check & 0xFFFF) + (pseudo_check >> 16);
+				udph->check = (uint16_t)pseudo_check;
+			}
+			//printk("pseudo_check = %u\n", pseudo_check);
+			//printk("udp checksum = %hu\n", udph->check);
+			iph->daddr = sfc_info.next_ip;
+			//iph->saddr = sfc_info.sa_ip;
 			udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
 			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 			ip_send_check(iph);
-			udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
+			//udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
 			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
-			memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
+			//memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
 			//printk("mach->h_dest = %pM\n", mach->h_dest);
 			//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
 		}
-	}
-	
+	//}
+	/*else if(sfc_set == END) {
+		iph->daddr = sfc_info.sa_ip;
+		udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
+		ip_send_check(iph);
+		udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
+		memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
+	}*/
 	//printk("data len = %u\n", skb->data_len);
 	//printk("mac header = %s\ninner = %s\n", skb_network_header(skb));
 	/*
@@ -5172,7 +5189,9 @@ static void nl_data_ready(struct sk_buff *skb)
     }
     nlh = (struct nlmsghdr *)skb->data;
     sfc_info.vf = ((sfc_t*)NLMSG_DATA(nlh))->vf;
+    sfc_info.prev_ip = ((sfc_t*)NLMSG_DATA(nlh))->prev_ip;
     sfc_info.ip = ((sfc_t*)NLMSG_DATA(nlh))->ip;
+    sfc_info.next_ip = ((sfc_t*)NLMSG_DATA(nlh))->next_ip;
     memcpy(sfc_info.mac,((sfc_t*)NLMSG_DATA(nlh))->mac,6);
     sfc_info.sa_ip = ((sfc_t*)NLMSG_DATA(nlh))->sa_ip;
     memcpy(sfc_info.sa_mac,((sfc_t*)NLMSG_DATA(nlh))->sa_mac,6);
@@ -5284,3 +5303,4 @@ static void __exit ixgbevf_exit_module(void)
 module_exit(ixgbevf_exit_module);
 
 /* ixgbevf_main.c */
+
