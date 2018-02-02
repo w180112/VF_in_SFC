@@ -4284,28 +4284,31 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 	//data_len = ntohs(iph->tot_len) - iph->ihl*4 - sizeof(*udph);
 	//printk("data length = %d\n", data_len);
 	//if (sfc_set == FIRST || sfc_set == NODE) {
-		if ((iph->daddr == sfc_info.prev_ip) && (udph->dest == 8270)) {
-			//printk("sfc list mac = %pM\n", sfc_info.mac);
+	if ((iph->daddr == sfc_info.prev_ip) && (udph->dest == 8270)) {
+		//printk("sfc list mac = %pM\n", sfc_info.mac);
+		/*if this VM is the last node in chain then we update udp checksum*/
+		if (sfc_info.sfc_mode == END) {
 			uint32_t pseudo_check;
-			//printk("udp checksum = %hu\n", udph->check);
-			if (sfc_info.sfc_mode == END) {
-				if ((pseudo_check = udph->check + (sfc_info.next_ip>>16) - (iph->daddr>>16)) >> 16)
-					pseudo_check = (pseudo_check & 0xFFFF) + (pseudo_check >> 16);
-				udph->check = (uint16_t)pseudo_check;
+			/*update udp pseudo header*/
+			if ((pseudo_check = udph->check + (sfc_info.next_ip>>16) - (iph->daddr>>16)) >> 16) {
+				/*add carry*/
+				pseudo_check = (pseudo_check & 0xFFFF) + (pseudo_check >> 16);
 			}
+			udph->check = (uint16_t)pseudo_check;
+		}
 			//printk("pseudo_check = %u\n", pseudo_check);
 			//printk("udp checksum = %hu\n", udph->check);
-			iph->daddr = sfc_info.next_ip;
+		iph->daddr = sfc_info.next_ip;
 			//iph->saddr = sfc_info.sa_ip;
-			udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
-			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
-			ip_send_check(iph);
+		udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
+			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);			
+		ip_send_check(iph);
 			//udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
-			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
+		memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
 			//memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
 			//printk("mach->h_dest = %pM\n", mach->h_dest);
 			//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
-		}
+	}
 	//}
 	/*else if(sfc_set == END) {
 		iph->daddr = sfc_info.sa_ip;
