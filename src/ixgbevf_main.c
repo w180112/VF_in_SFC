@@ -74,9 +74,6 @@
 #define DRV_SUMMARY __stringify(Intel(R) 10GbE PCI Express Virtual Function Driver)
 #define NETLINK_TEST 17
 
-
-
-
 const char ixgbevf_driver_version[] = DRV_VERSION;
 char ixgbevf_driver_name[] = "ixgbevf";
 static const char ixgbevf_driver_string[] = DRV_SUMMARY;
@@ -84,8 +81,8 @@ static const char ixgbevf_copyright[] = "Copyright(c) 1999 - 2016 Intel Corporat
 static struct sock *nl_sk = NULL;
 
 void nl_data_ready(struct sk_buff *skb);
-uint16_t udp_checksum();
 
+/*define each VM's state, set from sfc_daemon*/
 enum {
 	OFF,
 	FIRST,
@@ -108,8 +105,6 @@ sfc_t sfc_info;
 struct ethhdr *mach;
 struct iphdr *iph;
 struct udphdr *udph;
-
-uint8_t sfc_set = 0;
 
 void netlink_test();
 
@@ -4270,53 +4265,35 @@ static int ixgbevf_xmit_frame_ring(struct sk_buff *skb,
 		dev_kfree_skb(skb);
 		return NETDEV_TX_OK;
 	}
-	/*new for SFC*/
-	/*1711935660 is 172.16.10.102*/
-	//printk("sa_ip %u\n", sfc_info.sa_ip);
+
 	/*new for SFC*/
 	//data_len = ntohs(iph->tot_len) - tcph->doff*4 - iph->ihl*4;
 	//data_len = ntohs(iph->tot_len) - iph->ihl*4 - sizeof(*udph);
-	//printk("data length = %d\n", data_len);
-	//if (sfc_set == FIRST || sfc_set == NODE) {
 	mach = (struct ethhdr *)(skb->head+skb->mac_header);
 	iph = (struct iphdr*)(skb->head+skb->network_header);
 	udph = (void *)iph + iph->ihl*4;
+    
 	if (sfc_info.sfc_mode != OFF) {
+        /*8270 is little endian of 20000*/
+        /*We modify our packet info when origin dest ip == the prev ip in SFC*/
 		if ((iph->daddr == sfc_info.prev_ip) && (udph->dest == 8270)) {
-			//printk("sfc list mac = %pM\n", sfc_info.mac);
-			//printk("udp checksum = %hu\n", udph->check);
+            /*we fix udp checksum only when in the last VM*/
 			if (sfc_info.sfc_mode != END)
+                /*make receiver skb->ip_summed = CHECKSUM_UNNECESSARY*/
 				udph->check = 0;
 			else {
 				uint32_t pseudo_check;
+                /*add the differ of 2 ip addr and check whether there is carry*/
 				if ((pseudo_check = udph->check + (sfc_info.next_ip>>16) - (iph->daddr>>16)) >> 16)
 					pseudo_check = (pseudo_check & 0xFFFF) + (pseudo_check >> 16);
 				udph->check = (uint16_t)pseudo_check;
 			}
-				
-			//printk("pseudo_check = %u\n", pseudo_check);
-			//printk("udp checksum = %hu\n", udph->check);
 			iph->daddr = sfc_info.next_ip;
-			//iph->saddr = sfc_info.sa_ip;
-			//udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
-			//printk("iph = %u skb ip = %u dest port = %u\n",iph->daddr, ip_hdr(skb)->daddr, tcp->dest);
 			ip_send_check(iph);
-			//udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
 			memcpy(mach->h_dest,sfc_info.mac,ETH_ALEN);
-			//memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
-			//printk("mach->h_dest = %pM\n", mach->h_dest);
-			//printk("sa mac = %pM da mac = %pM\n", eth_hdr(skb)->h_source, eth_hdr(skb)->h_dest);
 		}
 	}
-	/*else if(sfc_set == END) {
-		iph->daddr = sfc_info.sa_ip;
-		udph->dest = ((20000 >> 8) & 0x00FF) | ((20000 << 8) & 0xFF00);
-		ip_send_check(iph);
-		udph->check = udp_checksum(udph,udph->len,iph->saddr,iph->daddr);
-		memcpy(mach->h_source,sfc_info.sa_mac,ETH_ALEN);
-	}*/
-	//printk("data len = %u\n", skb->data_len);
-	//printk("mac header = %s\ninner = %s\n", skb_network_header(skb));
+    
 	/*
 	 * need: 1 descriptor per page * PAGE_SIZE/IXGBE_MAX_DATA_PER_TXD,
 	 *       + 1 desc for skb_headlen/IXGBE_MAX_DATA_PER_TXD,
@@ -4989,15 +4966,9 @@ static int __devinit ixgbevf_probe(struct pci_dev *pdev,
 
 	DPRINTK(PROBE, INFO, "%s\n", ixgbevf_driver_string);
 	cards_found++;
+    
 	/*call netlink*/
-
 	netlink_test();
-
-	/*tell ovs the function*/
-	
-	/*spin_lock_bh(&netlink.adapter->mbx_lock);
-    	netlink.retval = mbx->ops.write_posted(netlink.hw, netlink.msg, 256, 0);
-    	spin_unlock_bh(&netlink.adapter->mbx_lock);*/
 	
 	return 0;
 
@@ -5182,9 +5153,8 @@ static struct pci_driver ixgbevf_driver = {
 void nl_data_ready(struct sk_buff *skb)
 {
     struct nlmsghdr *nlh = NULL;
-    //sfc_t buf;
 
-    if(skb == NULL) {
+    if (skb == NULL) {
         printk(KERN_INFO"skb is NULL\n");
         return;
     }
@@ -5197,24 +5167,6 @@ void nl_data_ready(struct sk_buff *skb)
     sfc_info.sa_ip = ((sfc_t*)NLMSG_DATA(nlh))->sa_ip;
     memcpy(sfc_info.sa_mac,((sfc_t*)NLMSG_DATA(nlh))->sa_mac,6);
     sfc_info.sfc_mode = ((sfc_t*)NLMSG_DATA(nlh))->sfc_mode;
-    /*printk("vf = %d ip = %s\n", sfc_info.vf, sfc_info.ip);
-    int j;
-    //memcpy(&sfc_info,&buf,sizeof(buf));
-    for(j=0; j<6; j++) {
-	printk("sfc mac = %x\n", sfc_info.mac[j]);
-    }
-    printk("receive sfc mac = %pM\n", sfc_info.mac);*/
-    sfc_set = sfc_info.sfc_mode;
-    printk("sfc mode = %u\n", sfc_set);
-    //printk(KERN_INFO"%s:received message from %d|%d|%d|%d: %s\n", __FUNCTION__, nlh->nlmsg_pid, NETLINK_CB(skb).portid, nlmsg_total_size(0), skb->len, (char *)NLMSG_DATA(nlh));
-    // print info of nlh
-    /*printk(KERN_INFO"In Recved Msg type|len|flags|pid|seq %d|%d|%d|%d|%d\n",
-    	nlh->nlmsg_type,
-	nlh->nlmsg_len,
-        nlh->nlmsg_flags,
-        nlh->nlmsg_pid,
-        nlh->nlmsg_seq);*/
-	//strtoul((char*)NLMSG_DATA(nlh), &p, 16);
 }
 
 void netlink_test()
@@ -5227,44 +5179,6 @@ void netlink_test()
     if (!nl_sk) {
         printk(KERN_ERR"Failed to create nerlink socket\n");
     }
-}
-
-uint16_t udp_checksum(const void *buff, size_t len, uint32_t src_addr, uint32_t dest_addr)
-{
-        const uint16_t *buf = buff;
-        uint16_t *ip_src = (void *)&src_addr, *ip_dst = (void *)&dest_addr;
-        uint32_t sum;
-        size_t length = len;
- 
-        // Calculate the sum                                            //
-        sum = 0;
-        while (len > 1) {
-                sum += *buf++;
-                if (sum & 0x80000000)
-                        sum = (sum & 0xFFFF) + (sum >> 16);
-                len -= 2;
-        }
- 
-        if ( len & 1 )
-                // Add the padding if the packet lenght is odd          //
-                sum += *((uint8_t *)buf);
- 
-        // Add the pseudo-header                                        //
-        sum += *(ip_src++);
-        sum += *ip_src;
- 
-        sum += *(ip_dst++);
-        sum += *ip_dst;
- 
-        sum += htons(IPPROTO_UDP);
-        sum += htons(length);
- 
-        // Add the carries                                              //
-        while (sum >> 16)
-                sum = (sum & 0xFFFF) + (sum >> 16);
- 
-        // Return the one's complement of sum                           //
-        return ( (uint16_t)(~sum)  );
 }
 
 /**
@@ -5283,7 +5197,6 @@ static int __init ixgbevf_init_module(void)
 	printk(KERN_INFO "%s\n", ixgbevf_copyright);
 
 	ret = pci_register_driver(&ixgbevf_driver);
-	//netlink_test();
 	return ret;
 }
 
